@@ -1,0 +1,156 @@
+---
+title: "Untitled"
+output: pdf_document
+date: "2026-05-19"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(dplyr)
+```
+
+
+```{r}
+title_ratings <- read.delim("title.ratings.tsv", header = TRUE)
+title_basics <- read.delim("title.basics.tsv", header = TRUE)
+```
+
+```{r}
+ratings <- merge(title_ratings, title_basics, by = "tconst", all.x = TRUE)
+```
+
+```{r}
+n_distinct(ratings$startYear)
+ratings <- ratings %>% filter(grepl("^\\d{4}$", startYear))
+unique(ratings$startYear)
+```
+1881 to 2024
+
+```{r}
+# build_yield_csv.R
+# Consolidate yield_*.nc4 files from each crop subfolder into one long-format CSV.
+# Output columns: crop, year, lat, lon, yield
+
+library(ncdf4)
+library(dplyr)
+library(readr)
+
+# Folder containing this script and the crop subfolders.
+# If running interactively in RStudio, set this to your project folder, e.g.:
+# project_dir <- "C:/Users/jerem/OneDrive/Documents/Stat 405/Final Project"
+project_dir <- getwd()
+
+crops <- c("maize", "maize_major", "maize_second",
+           "rice",  "rice_major",  "rice_second",
+           "soybean",
+           "wheat", "wheat_spring", "wheat_winter")
+
+# Read one .nc4 file -> tibble of valid (non-NA) cells
+read_yield_nc <- function(path, crop, year) {
+  nc  <- nc_open(path)
+  on.exit(nc_close(nc))
+
+  lon <- ncvar_get(nc, "lon")          # length 720, 0.25 .. 359.75
+  lat <- ncvar_get(nc, "lat")          # length 360, -89.75 .. 89.75
+  v   <- ncvar_get(nc, "var")          # matrix [lon, lat]
+  fv  <- ncatt_get(nc, "var", "_FillValue")$value
+  if (!is.null(fv)) v[v == fv] <- NA
+
+  # Mark valid cells, pull their indices, build a tidy frame.
+  idx <- which(!is.na(v), arr.ind = TRUE)
+  if (nrow(idx) == 0) return(NULL)
+
+  lon_vals <- lon[idx[, 1]]
+  # Convert 0..360 -> -180..180
+  lon_vals <- ifelse(lon_vals > 180, lon_vals - 360, lon_vals)
+
+  tibble(
+    crop  = crop,
+    year  = year,
+    lat   = lat[idx[, 2]],
+    lon   = lon_vals,
+    yield = v[idx]
+  )
+}
+
+# Walk every crop folder and every yearly file.
+all_files <- list()
+for (crop in crops) {
+  crop_dir <- file.path(project_dir, crop)
+  files <- list.files(crop_dir, pattern = "^yield_\\d{4}\\.nc4$", full.names = TRUE)
+  message("Reading ", length(files), " files from ", crop)
+  for (f in files) {
+    year <- as.integer(sub("^yield_(\\d{4})\\.nc4$", "\\1", basename(f)))
+    all_files[[length(all_files) + 1]] <- read_yield_nc(f, crop, year)
+  }
+}
+
+yields <- bind_rows(all_files)
+#message("Total rows: ", nrow(yields))
+#write_csv(yields, file.path(project_dir, "all_crop_yields.csv"))
+#message("Wrote all_crop_yields.csv (", nrow(yields), " rows)")
+```
+
+```{r}
+yield_by_crop_year <- yields %>%
+  group_by(crop, year) %>%
+  summarise(yield = sum(yield, na.rm = TRUE), .groups = "drop") %>%
+  arrange(crop, year)
+```
+
+```{r}
+maize <- data.frame()
+for (i in 1:nrow(yield_by_crop_year)){
+  if (yield_by_crop_year$crop[i] == "maize"){
+    maize <- rbind(maize, yield_by_crop_year[i,])
+  }
+}
+unique(yield_by_crop_year$crop)
+
+maize_major <- data.frame()
+for (i in 1:nrow(yield_by_crop_year)){
+  if (yield_by_crop_year$crop[i] == "maize_major"){
+    maize_major <- rbind(maize_major, yield_by_crop_year[i,])
+  }
+}
+
+maize_second <- data.frame()
+for (i in 1:nrow(yield_by_crop_year)){
+  if (yield_by_crop_year$crop[i] == "maize_second"){
+    maize_second <- rbind(maize_second, yield_by_crop_year[i,])
+  }
+}
+
+rice <- data.frame()
+for (i in 1:nrow(yield_by_crop_year)){
+  if (yield_by_crop_year$crop[i] == "rice"){
+    rice <- rbind(rice, yield_by_crop_year[i,])
+  }
+}
+
+rice_major <- data.frame()
+for (i in 1:nrow(yield_by_crop_year)){
+  if (yield_by_crop_year$crop[i] == "rice_major"){
+    rice_major <- rbind(rice_major, yield_by_crop_year[i,])
+  }
+}
+
+maize_major <- data.frame()
+for (i in 1:nrow(yield_by_crop_year)){
+  if (yield_by_crop_year$crop[i] == "maize"){
+    maize <- rbind(maize, yield_by_crop_year[i,])
+  }
+}
+
+maize_major <- data.frame()
+for (i in 1:nrow(yield_by_crop_year)){
+  if (yield_by_crop_year$crop[i] == "maize"){
+    maize <- rbind(maize, yield_by_crop_year[i,])
+  }
+}
+```
+
