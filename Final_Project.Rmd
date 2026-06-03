@@ -1,5 +1,5 @@
 ---
-title: "Untitled"
+title: "Stat 405 Final Project"
 output: pdf_document
 date: "2026-05-19"
 ---
@@ -11,24 +11,48 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 library(tidyverse)
 library(dplyr)
+library(tidyr)
 ```
 
-
+Don't run this code
 ```{r}
 title_ratings <- read.delim("title.ratings.tsv", header = TRUE)
 title_basics <- read.delim("title.basics.tsv", header = TRUE)
 ```
 
+Don't run this code
 ```{r}
 ratings <- merge(title_ratings, title_basics, by = "tconst", all.x = TRUE)
 ```
 
+
+Don't run this code
 ```{r}
 n_distinct(ratings$startYear)
 ratings <- ratings %>% filter(grepl("^\\d{4}$", startYear))
 unique(ratings$startYear)
+ratings$startYear <- as.integer(ratings$startYear)
+ratings <- ratings[order(ratings$startYear),]
+ratings <- ratings %>%
+  filter(ratings$startYear >= 1981)
+ratings <- na.omit(ratings)
+
+
+ratings_long <- ratings %>%
+  separate_rows(genres, sep = ",")
+
+
+yearly_ratings <- ratings_long %>%
+  group_by(startYear,genres) %>%
+  summarise(mean_ratings = mean(averageRating), count = n(), .groups = "drop")
+
+yearly_ratings <- yearly_ratings[!(yearly_ratings$genres == "\\N"),]
+yearly_ratings <- yearly_ratings[!(yearly_ratings$genres == "Reality-TV"),]
+n_distinct(yearly_ratings$genres)
+unique(yearly_ratings$genres)
 ```
 1881 to 2024
+
 
 ```{r}
 # build_yield_csv.R
@@ -139,18 +163,116 @@ for (i in 1:nrow(yield_by_crop_year)){
   }
 }
 
-maize_major <- data.frame()
+rice_second <- data.frame()
 for (i in 1:nrow(yield_by_crop_year)){
-  if (yield_by_crop_year$crop[i] == "maize"){
-    maize <- rbind(maize, yield_by_crop_year[i,])
+  if (yield_by_crop_year$crop[i] == "rice_second"){
+    rice_second <- rbind(maize_major, yield_by_crop_year[i,])
   }
 }
 
-maize_major <- data.frame()
+soybean <- data.frame()
 for (i in 1:nrow(yield_by_crop_year)){
-  if (yield_by_crop_year$crop[i] == "maize"){
-    maize <- rbind(maize, yield_by_crop_year[i,])
+  if (yield_by_crop_year$crop[i] == "soybean"){
+    soybean <- rbind(soybean, yield_by_crop_year[i,])
   }
 }
+
+wheat <- data.frame()
+for (i in 1:nrow(yield_by_crop_year)){
+  if (yield_by_crop_year$crop[i] == "wheat"){
+    wheat <- rbind(wheat, yield_by_crop_year[i,])
+  }
+}
+
+wheat_spring <- data.frame()
+for (i in 1:nrow(yield_by_crop_year)){
+  if (yield_by_crop_year$crop[i] == "wheat_spring"){
+    wheat_spring <- rbind(wheat_spring, yield_by_crop_year[i,])
+  }
+}
+
+wheat_winter <- data.frame()
+for (i in 1:nrow(yield_by_crop_year)){
+  if (yield_by_crop_year$crop[i] == "wheat_winter"){
+    wheat_winter <- rbind(wheat_winter, yield_by_crop_year[i,])
+  }
+}
+```
+
+```{r}
+write.csv(yield_by_crop_year, "yield_by_crop_year.csv")
+```
+
+
+Don't run this code
+```{r}
+options(width=90)
+ 
+library(RMySQL)
+ 
+drv <- dbDriver("MySQL")
+ 
+########################################
+xdbsock <- ""
+ 
+xdbuser <- Sys.getenv("MAS405_AWS_MY_DB_ADMIN_USER")
+xdbpw   <- Sys.getenv("MAS405_AWS_MY_DB_ADMIN_PW")
+xdbname <- Sys.getenv("MAS405_AWS_MY_DB_ADMIN_DBNAME")
+xdbhost <- Sys.getenv("MAS405_AWS_MY_DB_ADMIN_HOST")
+xdbport <- as.integer( Sys.getenv("MAS405_AWS_MY_DB_ADMIN_PORT") )
+ 
+con <-
+dbConnect(
+  drv,
+  user     = xdbuser,
+  password = xdbpw,
+  dbname   = xdbname,
+  host     = xdbhost,
+  port     = xdbport,
+  unix.sock= xdbsock
+)
+ 
+dbListTables(con)
+ 
+########################################
+# Helper: read TSV and upload to DB
+########################################
+upload_tsv <- function(con, filepath, table_name, overwrite = TRUE) {
+  cat("Reading:", filepath, "\n")
+  df <- read.delim(filepath, sep = "\t", header = TRUE,
+                   quote = "", na.strings = "\\N",
+                   stringsAsFactors = FALSE)
+  cat("  Rows:", nrow(df), " Cols:", ncol(df), "\n")
+  cat("  Uploading to table:", table_name, "\n")
+  dbWriteTable(con, name = table_name, value = df,
+               overwrite = overwrite, row.names = FALSE)
+  cat("  Done.\n")
+}
+ 
+########################################
+# Upload each TSV file
+########################################
+base_dir <- dirname(rstudioapi::getSourceEditorContext()$path)
+ 
+upload_tsv(con, file.path(base_dir, "title.basics.tsv"),  "title_basics")
+upload_tsv(con, file.path(base_dir, "title.ratings.tsv"), "title_ratings")
+upload_tsv(con, file.path(base_dir, "title.akas.tsv"),    "title_akas")
+ 
+########################################
+# Verify
+########################################
+cat("\nTables in DB after upload:\n")
+print( dbListTables(con) )
+ 
+cat("\ntitle_basics preview:\n")
+print( dbGetQuery(con, "SELECT * FROM title_basics LIMIT 5") )
+ 
+cat("\ntitle_ratings preview:\n")
+print( dbGetQuery(con, "SELECT * FROM title_ratings LIMIT 5") )
+ 
+cat("\ntitle_akas preview:\n")
+print( dbGetQuery(con, "SELECT * FROM title_akas LIMIT 5") )
+ 
+dbDisconnect(con)
 ```
 
