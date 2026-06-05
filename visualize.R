@@ -1,53 +1,39 @@
-library(readr)
-library(dplyr)
-library(ggplot2)
-library(tidyr)
+# Get an alphabetical list of all 24 genres
+all_genres <- sort(unique(df_long$genres))
 
-# 1. Load the data
-df <- read_csv("combined_yield_ratings.csv")
+# Open a standard landscape letter-sized PDF document
+pdf("all_24_genres_by_pages.pdf", width = 11, height = 8.5)
 
-# 2. Filter for wheat and reshape the data
-df_long <- df %>%
-  # Keep ONLY wheat data
-  filter(crop == "wheat") %>%
+# Loop through the 24 genres in blocks of 6
+for (i in seq(1, length(all_genres), by = 6)) {
   
-  # Filter for major genres to keep the plot readable
-  # (Feel free to add/remove genres from this list)
-  filter(genres %in% c("Action", "Comedy", "Drama", "Documentary", "Horror", "Sci-Fi")) %>%
+  current_batch <- all_genres[i:min(i + 5, length(all_genres))]
+  page_data <- df_long %>% filter(genres %in% current_batch)
   
-  # Pivot the two metrics into a single column
-  pivot_longer(
-    cols = c(net_change, mean_ratings),
-    names_to = "metric",
-    values_to = "value"
-  ) %>%
+  p_page <- ggplot(page_data, aes(x = year, y = value, color = metric, group = metric)) +
+    geom_line(linewidth = 0.8, alpha = 0.8) + 
+    geom_point(size = 1.2, alpha = 0.6) +
+    
+    # 6 panels per page (2 rows x 3 columns) makes every single line spacious and readable
+    facet_wrap(~ genres, ncol = 3) + 
+    
+    scale_color_manual(values = c("Wheat Yield % Change" = "darkgoldenrod", 
+                                  "Movie Rating % Change" = "royalblue")) +
+    theme_minimal(base_size = 12) +
+    labs(
+      title = "Wheat Yield vs. Movie Ratings Percentage Change",
+      subtitle = paste("Comprehensive Genre Analysis (Page", (i-1)/6 + 1, "of 4)"),
+      x = "Year",
+      y = "Percentage Change (%)",
+      color = "Metric"
+    ) +
+    theme(
+      legend.position = "bottom",
+      strip.text = element_text(face = "bold"),
+      panel.grid.minor = element_blank()
+    )
   
-  # Clean up metric names for the row labels
-  mutate(metric = recode(metric, 
-                         "net_change" = "Wheat Net Change", 
-                         "mean_ratings" = "Mean Movie Rating"))
+  print(p_page)
+}
 
-# 3. Create the multi-panel plot
-p = ggplot(df_long, aes(x = year, y = value, group = genres)) +
-  # Using 'linewidth' to prevent warnings, and a fixed color since there is only 1 crop
-  geom_line(linewidth = 0.8, color = "darkgoldenrod", alpha = 0.8) + 
-  geom_point(size = 1.2, color = "darkgoldenrod", alpha = 0.6) +
-  
-  # Separate metrics vertically and genres horizontally
-  facet_grid(metric ~ genres, scales = "free_y") +
-  
-  theme_minimal(base_size = 12) +
-  labs(
-    title = "Wheat Net Change vs. Movie Ratings Over Time",
-    subtitle = "Stratified by selected genres (1983 - 2016)",
-    x = "Year",
-    y = "Value (Scale depends on metric)"
-  ) +
-  theme(
-    strip.text = element_text(face = "bold", size = 11),
-    panel.grid.minor = element_blank(),
-    plot.title = element_text(face = "bold", hjust = 0.5),
-    plot.subtitle = element_text(hjust = 0.5, color = "gray30")
-  )
-
-ggsave("wheat_vs_ratings_plot.png", plot = p, width = 10, height = 6, dpi = 300) 
+dev.off()

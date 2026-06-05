@@ -16,7 +16,7 @@ crop_yields <- crop_yields %>%
 crop_yields <- crop_yields %>%
   arrange(crop, year) %>% 
   group_by(crop) %>% 
-  mutate(net_change = yield - lag(yield)) %>% 
+  mutate(pct_change_yield = (yield - lag(yield)) / lag(yield) * 100) %>% 
   ungroup()
 
 #Remove the now NA values for 1982
@@ -59,6 +59,12 @@ combined_data <- movie_ratings %>%
 
 combined_data = combined_data %>% 
     rename(year = startYear)
+
+combined_data <- combined_data %>%
+  arrange(genres, year) %>%
+  group_by(genres) %>%
+  mutate(pct_change_rating = (mean_ratings - lag(mean_ratings)) / lag(mean_ratings) * 100) %>%
+  ungroup()
 
 write.csv(combined_data, "updated_movie_yearly_ratings.csv", row.names = FALSE)
 
