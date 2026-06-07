@@ -104,6 +104,9 @@ write.csv(
   row.names = FALSE
 )
 
+library(knitr)
+kable(top10_absolute, format = "latex", booktabs = TRUE)
+
 # Heatmap visualization
 
 heatmap_plot <-
@@ -129,3 +132,17 @@ ggsave(
   height = 8,
   dpi = 300
 )
+
+# FDR adjusted p-values
+
+lagged_results <-
+  lagged_results %>%
+  mutate(
+    p_fdr = p.adjust(
+      p_value,
+      method = "BH"
+    )
+  )
+
+sig_results <- lagged_results %>%
+  filter(p_fdr < 0.05)
