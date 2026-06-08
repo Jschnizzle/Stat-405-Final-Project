@@ -12,6 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(dplyr)
 library(tidyr)
+library(ggplot2)
 ```
 
 Don't run this code
@@ -34,7 +35,7 @@ unique(ratings$startYear)
 ratings$startYear <- as.integer(ratings$startYear)
 ratings <- ratings[order(ratings$startYear),]
 ratings <- ratings %>%
-  filter(ratings$startYear >= 1981)
+  filter(ratings$startYear >= 1981 & ratings$startYear<=2016)
 ratings <- na.omit(ratings)
 
 
@@ -52,6 +53,55 @@ n_distinct(yearly_ratings$genres)
 unique(yearly_ratings$genres)
 ```
 1881 to 2024
+
+```{r}
+#write.csv(yearly_ratings, "yearly_ratings.csv", row.names=FALSE)
+```
+
+
+Total numbers for each genre
+```{r}
+genre_counts <- yearly_ratings %>%
+  group_by(genres) %>%
+  summarise(total_count = sum(count))
+write.csv(genre_counts, "genre_counts.csv", row.names=FALSE)
+```
+
+
+Action Movie Ratings against time
+```{r}
+yearly_ratings %>%
+  filter(genres == "Action") %>%
+  ggplot(aes(x = startYear, y = mean_ratings)) +
+  geom_line() +
+  labs(title = "Mean Rating of Action Movies Over Time",
+       x = "Year", y = "Mean Rating")
+```
+
+Sci-Fi Movie Ratings Over Time
+```{r}
+yearly_ratings %>%
+  filter(genres == "Sci-Fi") %>%
+  ggplot(aes(x = startYear, y = mean_ratings)) +
+  geom_line() +
+  labs(title = "Mean Rating of Sci-Fi Movies Over Time",
+       x = "Year", y = "Mean Rating")
+```
+
+
+Comedy Movie Ratings Over Time
+```{r}
+yearly_ratings %>%
+  filter(genres == "Comedy") %>%
+  ggplot(aes(x = startYear, y = mean_ratings)) +
+  geom_line() +
+  labs(title = "Mean Rating of Comedy Movies Over Time",
+       x = "Year", y = "Mean Rating")
+```
+
+```{r}
+#write.csv(yearly_ratings, "movie_yearly_ratings.csv")
+```
 
 
 ```{r}
@@ -115,8 +165,12 @@ for (crop in crops) {
 
 yields <- bind_rows(all_files)
 #message("Total rows: ", nrow(yields))
-#write_csv(yields, file.path(project_dir, "all_crop_yields.csv"))
+write.csv(yields, "all_crop_yields.csv", row.names = FALSE)
 #message("Wrote all_crop_yields.csv (", nrow(yields), " rows)")
+```
+
+```{r}
+yields <- read.csv("all_crop_yields.csv")
 ```
 
 ```{r}
@@ -124,6 +178,9 @@ yield_by_crop_year <- yields %>%
   group_by(crop, year) %>%
   summarise(yield = sum(yield, na.rm = TRUE), .groups = "drop") %>%
   arrange(crop, year)
+
+yield_by_crop_year <- yield_by_crop_year %>%
+  filter(year != 1981)
 ```
 
 ```{r}
@@ -200,79 +257,22 @@ for (i in 1:nrow(yield_by_crop_year)){
 ```
 
 ```{r}
-write.csv(yield_by_crop_year, "yield_by_crop_year.csv")
+#write.csv(yield_by_crop_year, "yield_by_crop_year.csv")
 ```
 
-
-Don't run this code
 ```{r}
-options(width=90)
- 
-library(RMySQL)
- 
-drv <- dbDriver("MySQL")
- 
-########################################
-xdbsock <- ""
- 
-xdbuser <- Sys.getenv("MAS405_AWS_MY_DB_ADMIN_USER")
-xdbpw   <- Sys.getenv("MAS405_AWS_MY_DB_ADMIN_PW")
-xdbname <- Sys.getenv("MAS405_AWS_MY_DB_ADMIN_DBNAME")
-xdbhost <- Sys.getenv("MAS405_AWS_MY_DB_ADMIN_HOST")
-xdbport <- as.integer( Sys.getenv("MAS405_AWS_MY_DB_ADMIN_PORT") )
- 
-con <-
-dbConnect(
-  drv,
-  user     = xdbuser,
-  password = xdbpw,
-  dbname   = xdbname,
-  host     = xdbhost,
-  port     = xdbport,
-  unix.sock= xdbsock
-)
- 
-dbListTables(con)
- 
-########################################
-# Helper: read TSV and upload to DB
-########################################
-upload_tsv <- function(con, filepath, table_name, overwrite = TRUE) {
-  cat("Reading:", filepath, "\n")
-  df <- read.delim(filepath, sep = "\t", header = TRUE,
-                   quote = "", na.strings = "\\N",
-                   stringsAsFactors = FALSE)
-  cat("  Rows:", nrow(df), " Cols:", ncol(df), "\n")
-  cat("  Uploading to table:", table_name, "\n")
-  dbWriteTable(con, name = table_name, value = df,
-               overwrite = overwrite, row.names = FALSE)
-  cat("  Done.\n")
-}
- 
-########################################
-# Upload each TSV file
-########################################
-base_dir <- dirname(rstudioapi::getSourceEditorContext()$path)
- 
-upload_tsv(con, file.path(base_dir, "title.basics.tsv"),  "title_basics")
-upload_tsv(con, file.path(base_dir, "title.ratings.tsv"), "title_ratings")
-upload_tsv(con, file.path(base_dir, "title.akas.tsv"),    "title_akas")
- 
-########################################
-# Verify
-########################################
-cat("\nTables in DB after upload:\n")
-print( dbListTables(con) )
- 
-cat("\ntitle_basics preview:\n")
-print( dbGetQuery(con, "SELECT * FROM title_basics LIMIT 5") )
- 
-cat("\ntitle_ratings preview:\n")
-print( dbGetQuery(con, "SELECT * FROM title_ratings LIMIT 5") )
- 
-cat("\ntitle_akas preview:\n")
-print( dbGetQuery(con, "SELECT * FROM title_akas LIMIT 5") )
- 
-dbDisconnect(con)
+plot(wheat$year, wheat$yield, type = "l", xlab = "Year", ylab = "Yield", main = "Wheat Yield Over Time")
+```
+
+```{r}
+plot(maize$year, maize$yield, type = "l", xlab = "Year", ylab = "Yield", main = "Maize Yield Over Time")
+```
+
+```{r}
+plot(rice$year, rice$yield, type = "l", xlab = "Year", ylab = "Yield", main = "Rice Yield Over Time")
+```
+
+```{r}
+plot(soybean$year, soybean$yield, type = "l", xlab = "Year", ylab = "Yield", main = "Soybean Yield Over Time")
 ```
 
